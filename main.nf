@@ -1,15 +1,5 @@
-params.msa = "data/alignment.fasta"
-params.results="results"
-params.collapse=0.1
-params.collapseref=false
-params.nboot = 200
-
-nboot = params.nboot
 results=params.results
-msa = file(params.msa)
-collapse=params.collapse
-collapseref=params.collapseref
-
+    
 // Auto-detects alphabet (protein / nucleotide)
 process alphabet {
     label 'goalign'
@@ -47,7 +37,7 @@ process rename {
 
     script:
     """
-    goalign reformat phylip -i $msa --auto-detect | goalign rename --clean-names -o ${msa.baseName}_renamed.phy
+    goalign reformat phylip -i $msa --auto-detect | goalign rename -p --clean-names -o ${msa.baseName}_renamed.phy
     """
 }
 
@@ -169,9 +159,8 @@ process computeMetrics {
     tag "$id"
     publishDir "${results}${id}/", mode: 'link'
 
-
     input:
-    tuple val(id), val(alphabet), path(msa), path(supporttree)
+    tuple val(id), val(alphabet), path(msa), path(supporttree), path(treesize)
 
     output:
     tuple val(id), path("*homoplasies.txt")
@@ -179,38 +168,44 @@ process computeMetrics {
     script:
     if( alphabet == 'nucleotide' )
     """
-    ALI=\$(goalign stats char -p --per-sites -i ${$msa} | pars.pl)
+    ALI=\$(goalign stats char -p --per-sites -i $msa | pars.pl)
     LEN=\$(goalign stats length -p -i $msa)
-    ML=\$(gotree stats -i $supporttree | cut -f 6| tail -n 1)
+    ML=\$(cat $treesize)
     MLHOMO=\$(awk -v ml=\$ML -v len=\$LEN -v ali=\$ALI 'BEGIN{print (ml*len-ali)*100/ali}')
-    echo "ID\tAlphabet\tAliParsimony\tAliLength\tHomoplasy" > ${id}_homoplasies.txt
-    echo -e "$id\t$alphabet\t\$ALI\t\$LEN\t\$MLHOMO" >> ${id}_homoplasies.txt
+    echo "ID\tAlphabet\tAliParsimony\tAliLength\tTreeSize\tHomoplasy" > ${id}_homoplasies.txt
+    echo -e "$id\t$alphabet\t\$ALI\t\$LEN\t\$ML\t\$MLHOMO" >> ${id}_homoplasies.txt
     """
     else
     """
-    ALI=\$(goalign stats char -p --per-sites -i ${$msa} | pars_prot.pl)
+    ALI=\$(goalign stats char -p --per-sites -i $msa | pars_prot.pl)
     LEN=\$(goalign stats length -p -i $msa)
-    ML=\$(gotree stats -i $supporttree | cut -f 6| tail -n 1)
+    ML=\$(cat $treesize)
     MLHOMO=\$(awk -v ml=\$ML -v len=\$LEN -v ali=\$ALI 'BEGIN{print (ml*len-ali)*100/ali}')
-    echo "ID\tAlphabet\tAliParsimony\tAliLength\tHomoplasy" > ${id}_homoplasies.txt
-    echo -e "$id\t$alphabet\t\$ALI\t\$LEN\t\$MLHOMO" >> ${id}_homoplasies.txt
+    echo "ID\tAlphabet\tAliParsimony\tAliLength\tTreeSize\tHomoplasy" > ${id}_homoplasies.txt
+    echo -e "$id\t$alphabet\t\$ALI\t\$LEN\t\$ML\t\$MLHOMO" >> ${id}_homoplasies.txt
     """
 }
 
 process treeStats {
+    label 'gotree'
+    
     input:
     tuple val(id), path(supporttree)
 
     output:
     tuple val(id), path("*edges_ref.txt")
-
+    tuple val(id), path("*treesize.txt")
+    
     script:
     """
     gotree stats edges -i $supporttree > ${id}_edges_ref.txt
+    gotree stats -i $supporttree | cut -f 6| tail -n 1 > ${id}_treesize.txt
     """
 }
 
 process drawFigures {
+    label 'r'
+    
     tag "$id"
 
     publishDir "${results}${id}/", mode: 'link'
@@ -225,25 +220,27 @@ process drawFigures {
     """
 #!/bin/env Rscript
 library(ggplot2)
-library(forcats)
-library(zoo)
 library(dplyr)
 library(plyr)
 
-reftree = read.table($edges,header=T,sep="\t",na.strings="N/A")
+reftree = read.table("$edges",header=T,sep="\\t",na.strings="N/A")
 
 tmplen=reftree[reftree\$terminal=="false", ]
-tmplen[order(tmplen\$length*$alilen),"sortidx"]=seq(1,length(tmplen\$length)
+tmplen[order(tmplen\$length*$alilen),"sortidx"]=seq(1,length(tmplen\$length))
 tmplen\$sortidx=tmplen\$sortidx/length(tmplen\$sortidx)
-svg("$id_branch_lengths.svg",width=4.7,height=2.2)
-ggplot(tmplenhomo,aes(y=sortidx,x=$alilen*length))+geom_point(size=0.10)+theme_bw()
+svg("${id}_branch_lengths.svg",width=4.7,height=2.2)
+ggplot(tmplen,aes(y=sortidx,x=$alilen*length))+geom_point(size=0.10)+theme_bw()
 dev.off()
     """
 }
 
 
 workflow {
-    msa = Channel.fromPath(params.msa).map{it -> [it.baseName(), it]}
+    nboot = params.nboot
+    collapse=params.collapse
+    collapseref=params.collapseref
+
+    msa = Channel.fromPath(params.msa).map{it -> [it.baseName, it]}
     renamed=rename(msa)
     len = alilen(renamed).map{it ->  [it[0],Integer.parseInt(it[1].trim())]}
     alpharaw = alphabet(renamed)
@@ -256,7 +253,8 @@ workflow {
     weightboottrees = weightboot[1].groupTuple()
     weightsupport = computeWeightSupports(len.combine(reftree[1], by:0).combine(weightboottrees, by:0), collapse, collapseref)
 
-    metrics = computeMetrics(alphastr.combine(renamed, by:0).combine(weightsupport,by: 0)))
     stats = treeStats(weightsupport)
-    figures = drawFigures(stats.combine(len, by: 0))
+    figures = drawFigures(stats[0].combine(len, by: 0))
+    metrics = computeMetrics(alphastr.combine(renamed, by:0).combine(weightsupport,by: 0).combine(stats[1],by:0))
+    
 }
