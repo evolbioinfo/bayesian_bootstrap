@@ -26,11 +26,12 @@ Java and Apptainer/Singularity must be installed.
 If you want to execute BBOOT locally on your linux / macos machine, it should work as is.
 However, if you want to execute BBOOT on a specific environment, you may modify the configuration file, especially the "profiles" section. Several profiles are already defined:
 
-1. standard: Standard configuration of processes (containers, etc.)
-2. local: To run the workflow locally (no slurm / HPC)
-3. slurm: To run the workflow on a SLURM HPC (you need to modify the "queue" and "clusterOptions" values
+1. standard: Standard configuration of processes (containers, etc.).
+2. local: To run the workflow locally (no slurm / HPC).
+3. slurm: To run the workflow on a SLURM HPC (you need to modify the "queue" and "clusterOptions" values.
 4. singularity: To run the workflow using singularity images.
-5. arm64: If you are on an arm64 architecture, you may use this option
+5. docker: To run the workflow using docker images.
+6. arm64: If you are on an arm64 architecture, you may use this option.
 
 ## Executing the workflow
 
