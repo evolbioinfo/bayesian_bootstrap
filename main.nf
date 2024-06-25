@@ -229,7 +229,10 @@ tmplen=reftree[reftree\$terminal=="false", ]
 tmplen[order(tmplen\$length*$alilen),"sortidx"]=seq(1,length(tmplen\$length))
 tmplen\$sortidx=tmplen\$sortidx/length(tmplen\$sortidx)
 svg("${id}_branch_lengths.svg",width=4.7,height=2.2)
-ggplot(tmplen,aes(y=sortidx,x=$alilen*length))+geom_point(size=0.10)+theme_bw()
+ggplot(tmplen,aes(y=sortidx,x=$alilen*length))+geom_point(size=0.10)+ylab("Cumulative branches prop.")+theme_bw()
+dev.off()
+svg("${id}_branch_lengths_zoom.svg",width=4.7,height=2.2)
+ggplot(tmplen,aes(y=sortidx,x=$alilen*length))+ylab("Cumulative branches prop.")+geom_point(size=0.10)+xlim(0, 10)+scale_x_continuous(limits=c(0,10),breaks=0:10)+theme_bw()
 dev.off()
     """
 }

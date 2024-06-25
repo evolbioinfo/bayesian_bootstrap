@@ -26,10 +26,11 @@ Java and Apptainer/Singularity must be installed.
 If you want to execute BBOOT locally on your linux / macos machine, it should work as is.
 However, if you want to execute BBOOT on a specific environment, you may modify the configuration file, especially the "profiles" section. Several profiles are already defined:
 
-1. local: To run the workflow locally (no slurm / HPC)
-2. slurm: To run the workflow on a SLURM HPC (you need to modify the "queue" and "clusterOptions" values
-3. singularity: To run the workflow using singularity images.
-
+1. standard: Standard configuration of processes (containers, etc.)
+2. local: To run the workflow locally (no slurm / HPC)
+3. slurm: To run the workflow on a SLURM HPC (you need to modify the "queue" and "clusterOptions" values
+4. singularity: To run the workflow using singularity images.
+5. arm64: If you are on an arm64 architecture, you may use this option
 
 ## Executing the workflow
 
@@ -41,4 +42,16 @@ nextflow run main.nf --msa <MSA>
       --nboot <# BOOT REPLICATES: 200> 
       --collapse <COLLAPSE THRESHOLD: 0.1>
       -profile singularity,local
+```
+
+## Example dataset
+
+You can try the workflow with the example dataset:
+
+```
+nextflow run main.nf --msa sample_data/sample.fasta.gz
+      --results results
+      --nboot 1000
+      --collapse 0.1
+      -profile standard,singularity,local
 ```
