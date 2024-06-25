@@ -41,7 +41,7 @@ nextflow run main.nf --msa <MSA>
       --results <OUT DIR: results> 
       --nboot <# BOOT REPLICATES: 200> 
       --collapse <COLLAPSE THRESHOLD: 0.1>
-      -profile singularity,local
+      -profile standard,singularity,local
 ```
 
 ## Example dataset
